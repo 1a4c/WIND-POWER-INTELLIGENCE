@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WindDSL 9-Layer Cyber-Physical Signal Chain Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;700&family=Google+Sans+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Icons+Round" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Google Sans', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+        }
+        .code-font {
+            font-family: 'Google Sans Mono', monospace;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Glowing effects */
+        .glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.45); }
+        .glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.45); }
+        .glow-amber { box-shadow: 0 0 15px rgba(245, 158, 11, 0.45); }
+        .glow-rose { box-shadow: 0 0 15px rgba(244, 63, 94, 0.45); }
+    </style>
+</head>
+<body class="min-h-screen pb-12 overflow-x-hidden">
+
+    <nav class="border-b border-slate-800 bg-[#0c1322] px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="material-icons-round text-blue-500 text-3xl animate-spin" style="animation-duration: 10s;">settings_input_composite</span>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        WindDSL 虛實整合訊號鏈互動模擬平台
+                    </h1>
+                    <p class="text-xs text-slate-400">9-Layer Cyber-Physical Nested Call-Stack Oscilloscope Simulator</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-950 text-blue-400 border border-blue-800">
+                    <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                    TELEM BUFFER SECURE
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 md:px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- ==================== LEFT COLUMN: TURBINE SIM & CONTROLS (5 Cols) ==================== -->
+        <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Wind Turbine Simulation Card -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
+                <div class="border-b border-slate-800 bg-slate-900/90 px-5 py-4 flex justify-between items-center">
+                    <span class="font-bold text-sm text-white flex items-center gap-2">
+                        <span class="material-icons-round text-sky-400">turbine</span>
+                        實時物理風機模擬器
+                    </span>
+                    <span class="text-xs text-slate-400 font-medium px-2 py-0.5 rounded bg-slate-800 border border-slate-700 uppercase" id="turbine-state-tag">
+                        NORMAL_GENERATION
+                    </span>
+                </div>
+                
+                <div class="relative h-[280px] bg-slate-950 flex items-center justify-center">
+                    <canvas id="turbine-canvas" class="absolute inset-0 w-full h-full"></canvas>
+                    
+                    <!-- HUD overlay inside Turbine Canvas -->
+                    <div class="absolute top-4 left-4 bg-slate-950/80 border border-slate-800 p-3 rounded-xl backdrop-blur-md text-xs space-y-1.5 max-w-[180px]">
+                        <div class="flex justify-between gap-4"><span class="text-slate-400">濾波風速:</span><span class="font-bold text-sky-400 text-right" id="hud-wind">12.0 m/s</span></div>
+                        <div class="flex justify-between gap-4"><span class="text-slate-400">實時葉調:</span><span class="font-bold text-amber-400 text-right" id="hud-pitch">8.0°</span></div>
+                        <div class="flex justify-between gap-4"><span class="text-slate-400">轉子RPM:</span><span class="font-bold text-emerald-400 text-right" id="hud-rpm">14.2 RPM</span></div>
+                        <div class="flex justify-between gap-4"><span class="text-slate-400">發電功率:</span><span class="font-bold text-white text-right" id="hud-power">2.45 MW</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cyber-Physical Simulation Controls -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md space-y-6">
+                <h3 class="font-bold text-sm text-white uppercase tracking-wider border-b border-slate-800 pb-3 flex items-center gap-2">
+                    <span class="material-icons-round text-indigo-400">tune</span>
+                    物理與環境干擾注入面板
+                </h3>
+
+                <!-- Controls Layout -->
+                <div class="space-y-4 text-sm">
+                    <!-- Wind Speed -->
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between">
+                            <span class="text-slate-300 font-medium">基底自然風速</span>
+                            <span class="text-sky-400 code-font font-bold" id="lbl-wind-speed">12.0 m/s</span>
+                        </div>
+                        <input type="range" id="ctrl-wind-speed" min="0" max="35" step="0.5" value="12" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <!-- Rain Noise -->
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between">
+                            <span class="text-slate-300 font-medium flex items-center gap-1">
+                                暴雨及海霧干擾（降雨噪訊）
+                                <span class="text-rose-400 animate-pulse text-xs" id="rain-active-dot" style="display:none;">● ACTIVE</span>
+                            </span>
+                            <span class="text-rose-400 code-font font-bold" id="lbl-rain-noise">0%</span>
+                        </div>
+                        <input type="range" id="ctrl-rain-noise" min="0" max="100" step="5" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-rose-500">
+                    </div>
+
+                    <hr class="border-slate-800">
+
+                    <!-- Gearbox Resonance toggle -->
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-slate-300 font-medium block">齒輪箱嚙合高頻共振</span>
+                            <span class="text-xs text-slate-500">模擬主變速箱在特定轉速下產生的扭轉共振</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="ctrl-resonance" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500 peer-checked:after:bg-white"></div>
+                        </label>
+                    </div>
+
+                    <!-- Active Damping Filter toggle -->
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-slate-300 font-medium block">主動減震濾波器 (<code class="text-xs text-emerald-400">teeth_suppressed</code>)</span>
+                            <span class="text-xs text-slate-500">在發電機端注入反相高頻轉矩波，抵消共振波</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="ctrl-damping" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Emergency Pitch Manual Button -->
+                <div class="grid grid-cols-2 gap-4 pt-2">
+                    <button id="btn-emergency-pitch" class="py-2.5 px-4 rounded-xl text-xs font-bold border border-rose-500/30 bg-rose-950/20 text-rose-400 hover:bg-rose-900/30 hover:border-rose-500/50 transition-all flex items-center justify-center gap-1.5 shadow-md">
+                        <span class="material-icons-round text-sm">report_problem</span>
+                        手動觸發安全避風 (90°)
+                    </button>
+                    <button id="btn-reset-pitch" class="py-2.5 px-4 rounded-xl text-xs font-bold border border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800/80 transition-all flex items-center justify-center gap-1.5">
+                        <span class="material-icons-round text-sm">replay</span>
+                        重設常規調槳 (8°)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Terminal output window -->
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-2xl">
+                <div class="flex items-center justify-between text-xs text-slate-500 border-b border-slate-900 pb-2 mb-2 code-font">
+                    <span>SYSTEM DIAGNOSTIC CONSOLE</span>
+                    <span class="text-emerald-500">● ONLINE</span>
+                </div>
+                <div id="terminal-console" class="h-[120px] overflow-y-auto space-y-1.5 text-[11px] code-font text-slate-300 leading-relaxed scrollbar-thin">
+                    <div class="text-slate-500">[SYSTEM] Initialization completed successfully.</div>
+                    <div class="text-slate-500">[SYSTEM] All 9 Signal layers bound to RTOS IPC channel successfully.</div>
+                    <div class="text-emerald-400">[SYSTEM] WindDSL controller: listening on Modbus reg AI_Reg_0x4002 (Scan rate: 10ms).</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== RIGHT COLUMN: OSCILLOSCOPES & 9-LAYER FLOW (7 Cols) ==================== -->
+        <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Real-time Oscilloscope Center -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+                <div class="border-b border-slate-800 bg-slate-900/90 -mx-5 -mt-5 px-5 py-4 flex justify-between items-center mb-5 rounded-t-2xl">
+                    <span class="font-bold text-sm text-white flex items-center gap-2">
+                        <span class="material-icons-round text-emerald-400">analytics</span>
+                        高頻示波遙測中心
+                    </span>
+                    <span class="text-xs text-slate-400 code-font">Sampling Rate: 100Hz</span>
+                </div>
+
+                <!-- 3 Oscilloscope canvases -->
+                <div class="space-y-4">
+                    <!-- Scope 1: Wind speed filtering -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 relative">
+                        <div class="flex justify-between items-center text-xs mb-1">
+                            <span class="font-bold text-sky-400 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                                示波器 CH 1：風速除噪與環境濾波 
+                                <span class="text-[10px] text-slate-500 code-font">(`fog_gulf` → `shield_rain`)</span>
+                            </span>
+                            <span class="text-slate-500 text-[10px]"><span class="text-rose-400">■ 原始</span> / <span class="text-sky-400">■ 濾波</span></span>
+                        </div>
+                        <canvas id="scope1-canvas" class="w-full h-[80px] bg-slate-950 block rounded"></canvas>
+                    </div>
+
+                    <!-- Scope 2: Pitch control profile -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 relative">
+                        <div class="flex justify-between items-center text-xs mb-1">
+                            <span class="font-bold text-amber-400 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                示波器 CH 2：變槳伺服軌跡 
+                                <span class="text-[10px] text-slate-500 code-font">(`S-adjusted()` S曲線運動限制)</span>
+                            </span>
+                            <span class="text-slate-500 text-[10px]"><span class="text-slate-500">■ 目標</span> / <span class="text-amber-400">■ 實時</span></span>
+                        </div>
+                        <canvas id="scope2-canvas" class="w-full h-[80px] bg-slate-950 block rounded"></canvas>
+                    </div>
+
+                    <!-- Scope 3: Vibration suppressor -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 relative">
+                        <div class="flex justify-between items-center text-xs mb-1">
+                            <span class="font-bold text-rose-400 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                                示波器 CH 3：齒輪箱主動共振震動 
+                                <span class="text-[10px] text-slate-500 code-font">(`teeth_suppressed` 主動反相干涉)</span>
+                            </span>
+                            <span class="text-slate-500 text-[10px]"><span class="text-rose-400">■ 震動振幅</span></span>
+                        </div>
+                        <canvas id="scope3-canvas" class="w-full h-[80px] bg-slate-950 block rounded"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 9-Layer Nested Call Stack Visualization -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+                <h3 class="font-bold text-sm text-white uppercase tracking-wider mb-4 pb-2 border-b border-slate-800 flex items-center gap-2">
+                    <span class="material-icons-round text-blue-400 font-bold">mediation</span>
+                    Nested 9-Layer 實時訊號鏈解析圖
+                </h3>
+
+                <!-- Process Flow Grid (From Physical Source inside-out) -->
+                <div class="flex flex-col gap-2">
+                    <!-- Layer 1 -->
+                    <div id="flow-layer-1" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-blue-950/60 text-blue-400 border border-blue-900">LAYER 1</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">fog_gulf.cluster_moon()</div>
+                            <div class="text-[10px] text-slate-500">物理大氣源：採集海上氣象站、氣壓、超音波風速計原始高頻微秒脈衝。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm animate-pulse" id="node-icon-1">sensors</span>
+                    </div>
+
+                    <!-- Layer 2 -->
+                    <div id="flow-layer-2" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-blue-950/60 text-blue-400 border border-blue-900">LAYER 2</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">shield_rain.text_transform(...)</div>
+                            <div class="text-[10px] text-slate-500">降雨抗噪濾波：除去液滴噪訊與多重反射雜訊，轉譯為有效浮點風速。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-2">filter_alt</span>
+                    </div>
+
+                    <!-- Layer 3 -->
+                    <div id="flow-layer-3" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-purple-950/60 text-purple-400 border border-purple-900">LAYER 3</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">iMonkey.comet(...)</div>
+                            <div class="text-[10px] text-slate-500">雲端邊緣網關：Comet 串流、低延遲傳輸鏈路將資料封包送入塔底計算終端。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-3">swap_calls</span>
+                    </div>
+
+                    <!-- Layer 4 -->
+                    <div id="flow-layer-4" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-purple-950/60 text-purple-400 border border-purple-900">LAYER 4</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">stream_led().os_in_seam_commute(...)</div>
+                            <div class="text-[10px] text-slate-500">作業系統核心通訊：RTOS 任務排程安全隔離，低抖動向 PLC 控制核分發。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-4">router</span>
+                    </div>
+
+                    <!-- Layer 5 -->
+                    <div id="flow-layer-5" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-900">LAYER 5</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">omega_topdown_zone_fitted(...)</div>
+                            <div class="text-[10px] text-slate-500">風切流場擬合：基於葉輪旋轉角速度 ω，建立三維大氣風切與空氣動力學流場模型。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-5">wind_power</span>
+                    </div>
+
+                    <!-- Layer 6 -->
+                    <div id="flow-layer-6" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-900">LAYER 6</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">pentagon_suggested_cell_processed_feedback(...)</div>
+                            <div class="text-[10px] text-slate-500">五點載荷反饋：自機轂 5 點式應變片組件提取偏心力，實現獨立葉片載荷控制。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-6">grid_view</span>
+                    </div>
+
+                    <!-- Layer 7 -->
+                    <div id="flow-layer-7" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-900">LAYER 7</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">S-adjusted()</div>
+                            <div class="text-[10px] text-slate-500">伺服運動平滑：將 DSL 角度階躍輸入平滑為 S 型加減速曲線，防止葉片機械撕裂。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-7">trending_flat</span>
+                    </div>
+
+                    <!-- Layer 8 -->
+                    <div id="flow-layer-8" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-900">LAYER 8</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">teeth_suppressed(...)</div>
+                            <div class="text-[10px] text-slate-500">高頻嚙合抑制：主動減震核心。注入反相正弦弦波，全面中和齒輪嚙合共振。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-8">vibration</span>
+                    </div>
+
+                    <!-- Layer 9 -->
+                    <div id="flow-layer-9" class="flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300">
+                        <span class="text-[10px] code-font px-2 py-0.5 rounded bg-blue-950/60 text-blue-400 border border-blue-900">LAYER 9</span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-200 code-font">select_buffer.wire_stream_tooth(...)</div>
+                            <div class="text-[10px] text-slate-500">高頻遙測寫入：將最終過濾的高保真物理狀態快取至高速 Ring-Buffer 送返雲端。</div>
+                        </div>
+                        <span class="material-icons-round text-slate-600 text-sm" id="node-icon-9">dns</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Globals & Mathematical State variables ---
+        const state = {
+            windBase: 12.0,       // m/s
+            rainNoise: 0,         // % (0 to 100)
+            resonanceActive: false,
+            dampingActive: true,
+            
+            // Physics telemetry
+            targetPitch: 8.0,     // degrees (set by DSL rule / manual buttons)
+            currentPitch: 8.0,    // S-adjusted profile
+            actualWind: 12.0,     // Raw wind input with instantaneous rain noise
+            filteredWind: 12.0,   // Denoised wind (Layer 2)
+            turbineRPM: 14.2,
+            turbineAngle: 0,
+            generatedPower: 2.45,  // MW
+            gearVibration: 0.05,  // raw dynamic gearbox gear vibrations
+            
+            // Internal timers / velocities for S-adjusted S-curve profiles
+            pitchVelocity: 0.0,
+            
+            // Log array buffers for history plot (Scope depth)
+            scopeHistoryDepth: 200,
+            history: {
+                rawWind: [],
+                filteredWind: [],
+                targetPitch: [],
+                currentPitch: [],
+                gearVibration: []
+            }
+        };
+
+        // Initialize history arrays with zeros
+        for (let i = 0; i < state.scopeHistoryDepth; i++) {
+            state.history.rawWind.push(12.0);
+            state.history.filteredWind.push(12.0);
+            state.history.targetPitch.push(8.0);
+            state.history.currentPitch.push(8.0);
+            state.history.gearVibration.push(0.02);
+        }
+
+        // --- Core DOM Cache elements ---
+        const el = {
+            console: document.getElementById('terminal-console'),
+            lblWind: document.getElementById('lbl-wind-speed'),
+            lblRain: document.getElementById('lbl-rain-noise'),
+            ctrlWind: document.getElementById('ctrl-wind-speed'),
+            ctrlRain: document.getElementById('ctrl-rain-noise'),
+            ctrlResonance: document.getElementById('ctrl-resonance'),
+            ctrlDamping: document.getElementById('ctrl-damping'),
+            btnEmergency: document.getElementById('btn-emergency-pitch'),
+            btnReset: document.getElementById('btn-reset-pitch'),
+            
+            // HUD
+            hudWind: document.getElementById('hud-wind'),
+            hudPitch: document.getElementById('hud-pitch'),
+            hudRpm: document.getElementById('hud-rpm'),
+            hudPower: document.getElementById('hud-power'),
+            stateTag: document.getElementById('turbine-state-tag'),
+            
+            // Canvas Elements
+            turbineCanvas: document.getElementById('turbine-canvas'),
+            scope1Canvas: document.getElementById('scope1-canvas'),
+            scope2Canvas: document.getElementById('scope2-canvas'),
+            scope3Canvas: document.getElementById('scope3-canvas')
+        };
+
+        // Console utility log
+        function sysLog(message, isHighlight = false) {
+            const date = new Date();
+            const timeStr = date.toTimeString().split(' ')[0] + '.' + String(date.getMilliseconds()).padStart(3, '0');
+            const logDiv = document.createElement('div');
+            logDiv.className = isHighlight ? "text-amber-400" : "text-slate-400";
+            logDiv.textContent = `[${timeStr}] ${message}`;
+            el.console.appendChild(logDiv);
+            el.console.scrollTop = el.console.scrollHeight;
+        }
+
+        // --- STREAMING_CHUNK: Setting Up UI Control Event Listeners ---
+        el.ctrlWind.addEventListener('input', (e) => {
+            state.windBase = parseFloat(e.target.value);
+            el.lblWind.textContent = `${state.windBase.toFixed(1)} m/s`;
+            
+            // DSL Rules emulation on the fly
+            if (state.windBase > 20) {
+                if (state.targetPitch !== 90) {
+                    state.targetPitch = 90;
+                    sysLog("[DSL ACTION] wind_speed > 20. Triggers EMERGENCY_SHUTDOWN. Target Pitch -> 90°", true);
+                }
+            } else {
+                if (state.targetPitch === 90 && state.windBase <= 20) {
+                    state.targetPitch = 8;
+                    sysLog("[DSL ACTION] wind_speed inside safe zone. Reverting target pitch to 8°", false);
+                }
+            }
+        });
+
+        el.ctrlRain.addEventListener('input', (e) => {
+            state.rainNoise = parseInt(e.target.value);
+            el.lblRain.textContent = `${state.rainNoise}%`;
+            document.getElementById('rain-active-dot').style.display = state.rainNoise > 0 ? "inline" : "none";
+            if (state.rainNoise > 10) {
+                // Flash layer 2 to show active noise filtering
+                highlightLayerNode(2, 'blue');
+            } else {
+                dimLayerNode(2);
+            }
+        });
+
+        el.ctrlResonance.addEventListener('change', (e) => {
+            state.resonanceActive = e.target.checked;
+            sysLog(state.resonanceActive ? "[ALERT] Gearbox Resonance Detected! High frequency shearing active." : "[SYSTEM] Resonance ceased.", state.resonanceActive);
+            if (state.resonanceActive) {
+                highlightLayerNode(8, 'rose');
+            } else {
+                dimLayerNode(8);
+            }
+        });
+
+        el.ctrlDamping.addEventListener('change', (e) => {
+            state.dampingActive = e.target.checked;
+            sysLog(state.dampingActive ? "[ACTIVE] teeth_suppressed() active. Filtering resonance vibration." : "[WARNING] Active damping bypassed! High stress on planetary gears.", !state.dampingActive);
+        });
+
+        el.btnEmergency.addEventListener('click', () => {
+            state.targetPitch = 90;
+            sysLog("[MANUAL INTERRUPT] Pushing manual safe state. Pitch demand target -> 90°", true);
+        });
+
+        el.btnReset.addEventListener('click', () => {
+            state.targetPitch = 8;
+            sysLog("[MANUAL INTERRUPT] Restoring default optimal aerodynamics. Pitch demand -> 8°", false);
+        });
+
+        // Highlights layer nodes dynamically
+        function highlightLayerNode(layerNum, color) {
+            const node = document.getElementById(`flow-layer-${layerNum}`);
+            const icon = document.getElementById(`node-icon-${layerNum}`);
+            node.className = `flex items-center gap-4 bg-slate-900 border border-${color}-500/50 p-2.5 rounded-xl transition-all duration-300 glow-${color}`;
+            icon.className = `material-icons-round text-${color}-400 text-sm animate-pulse`;
+        }
+
+        function dimLayerNode(layerNum) {
+            const node = document.getElementById(`flow-layer-${layerNum}`);
+            const icon = document.getElementById(`node-icon-${layerNum}`);
+            node.className = "flex items-center gap-4 bg-slate-950/40 border border-slate-800 p-2.5 rounded-xl transition-all duration-300";
+            icon.className = "material-icons-round text-slate-600 text-sm";
+        }
+
+
+        // --- STREAMING_CHUNK: Developing the Mathematical Models ---
+        
+        // Low-pass exponential filter for Rain Noise Denoising (`shield_rain.text_transform`)
+        let filteredWindPrev = 12.0;
+        function filterWindSpeed(raw, noiseLevel, dt) {
+            // High noise decreases alpha (heavier damping)
+            const alpha = Math.max(0.01, 0.15 - (noiseLevel / 1000.0)); 
+            const filtered = alpha * raw + (1.0 - alpha) * filteredWindPrev;
+            filteredWindPrev = filtered;
+            return filtered;
+        }
+
+        // S-Curve Motion Profile constraint solver (`S-adjusted()`)
+        const maxPitchVelocity = 15.0; // max degrees per second (Limit of blade hydraulic actuators)
+        const maxPitchAcceleration = 20.0; // max degrees per second^2 (Jerk and stress limit)
+        
+        function updateSCurvePitch(target, current, dt) {
+            const error = target - current;
+            if (Math.abs(error) < 0.05) {
+                state.pitchVelocity = 0.0;
+                return target;
+            }
+            
+            // Deciding direction of travel
+            const dir = Math.sign(error);
+            
+            // Target speed based on distance (aerodynamic profile decelerating curve)
+            const targetSpeed = Math.sqrt(2.0 * maxPitchAcceleration * Math.abs(error)) * dir;
+            
+            // Clamp target speed to absolute maximum velocity
+            const targetSpeedClamped = Math.max(-maxPitchVelocity, Math.min(maxPitchVelocity, targetSpeed));
+            
+            // Calculate required acceleration to achieve that speed
+            const speedError = targetSpeedClamped - state.pitchVelocity;
+            const requiredAccel = speedError / dt;
+            
+            // Clamp acceleration to maximum allowed limit to maintain physical structural integrity
+            const accelClamped = Math.max(-maxPitchAcceleration, Math.min(maxPitchAcceleration, requiredAccel));
+            
+            // Update velocity and displacement
+            state.pitchVelocity += accelClamped * dt;
+            let nextPitch = current + state.pitchVelocity * dt;
+            
+            // Boundaries
+            if ((dir > 0 && nextPitch > target) || (dir < 0 && nextPitch < target)) {
+                nextPitch = target;
+                state.pitchVelocity = 0;
+            }
+            return nextPitch;
+        }
+
+        // Gearbox vibration calculation (`teeth_suppressed()`)
+        let vibPhase = 0;
+        function calculateResonanceVibration(rpm, resonanceOn, dampingOn, dt) {
+            // Base mechanical vibration scales with turbine rotational RPM
+            let baseVib = (rpm / 20.0) * 0.02 + (Math.sin(Date.now() * 0.005) * 0.005);
+            if (baseVib < 0.01) baseVib = 0.01;
+
+            if (!resonanceOn) {
+                return baseVib;
+            }
+
+            // Resonance mode active. Gear mesh frequency peaks near 12 RPM
+            const resonantPeakFactor = Math.exp(-Math.pow(rpm - 12.0, 2) / 8.0);
+            const highFreqPhaseSpeed = rpm * 2.0 * Math.PI * 1.5; // High frequency mesh vibration
+            vibPhase += highFreqPhaseSpeed * dt;
+            
+            const rawResonanceAmp = 0.45 * resonantPeakFactor;
+            const dynamicHighFreqMeshNoise = Math.sin(vibPhase) * rawResonanceAmp;
+
+            if (dampingOn) {
+                // active cancellation (injects anti-phase dynamic damping torque wave)
+                // leaves small residual mechanical dampings
+                const activeCancellationResidual = dynamicHighFreqMeshNoise * 0.08; 
+                return baseVib + Math.abs(activeCancellationResidual);
+            } else {
+                // unmitigated vibration, massive gears impact loads
+                return baseVib + Math.abs(dynamicHighFreqMeshNoise);
+            }
+        }
+
+
+        // --- STREAMING_CHUNK: Preparing Drawing Loops & Engine Setup ---
+        
+        // Wind turbine animation drawings
+        function drawTurbine(ctx, w, h) {
+            ctx.clearRect(0, 0, w, h);
+            
+            const cx = w / 2;
+            const cy = h * 0.7;
+            const towerHeight = h * 0.52;
+            const bladeLength = towerHeight * 0.72;
+            
+            // Ground background gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+            skyGrad.addColorStop(0, '#0a0f1d');
+            skyGrad.addColorStop(0.7, '#0e172a');
+            skyGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground base
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, 140, 18, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Steel Tower drawing
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.moveTo(cx - 16, cy);
+            ctx.lineTo(cx + 16, cy);
+            ctx.lineTo(cx + 6, cy - towerHeight);
+            ctx.lineTo(cx - 6, cy - towerHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            // Symmetrical nacelle housing
+            ctx.save();
+            ctx.translate(cx, cy - towerHeight);
+            
+            ctx.fillStyle = '#f8fafc';
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 26, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Blades rotational transform hub matrix
+            ctx.rotate(state.turbineAngle);
+
+            // Draw 3 aerodynamics blades
+            const drawSingleBlade = (angleOffset) => {
+                ctx.save();
+                ctx.rotate(angleOffset);
+
+                // Width of the drawn profile shrinks with pitch angle (90 deg = thin side profile)
+                const nominalWidth = 16;
+                const pitchRad = state.currentPitch * Math.PI / 180;
+                const dynamicProfileWidth = Math.max(1.8, nominalWidth * Math.cos(pitchRad));
+
+                // Blade spine line
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.quadraticCurveTo(dynamicProfileWidth, -bladeLength * 0.4, 2.5, -bladeLength);
+                ctx.quadraticCurveTo(-dynamicProfileWidth, -bladeLength * 0.4, 0, 0);
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1.5;
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.restore();
+            };
+
+            drawSingleBlade(0);
+            drawSingleBlade((2 * Math.PI) / 3);
+            drawSingleBlade((4 * Math.PI) / 3);
+
+            // Generator shaft central hub bullet
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- STREAMING_CHUNK: Designing the Oscilloscopes Plots Engine ---
+        
+        function drawOscilloscope(canvas, dataList1, dataList2 = null, yMin, yMax, color1, color2 = null) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            ctx.fillStyle = '#05070c';
+            ctx.fillRect(0, 0, w, h);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < w; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+            for (let y = 0; y < h; y += 20) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            const mapValueToY = (val) => {
+                const normalized = (val - yMin) / (yMax - yMin);
+                return h - normalized * h;
+            };
+
+            const plotCurve = (data, color, strokeWidth = 1.8) => {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = strokeWidth;
+                ctx.beginPath();
+                
+                for (let i = 0; i < data.length; i++) {
+                    const x = (i / (data.length - 1)) * w;
+                    const y = mapValueToY(data[i]);
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            };
+
+            // Plot channel line 1
+            plotCurve(dataList1, color1);
+
+            // Plot channel line 2 if supplied
+            if (dataList2) {
+                plotCurve(dataList2, color2, 1.2);
+            }
+        }
+
+
+        // --- STREAMING_CHUNK: Setting Up Live Simulation Loop ---
+        
+        let lastFrameTime = performance.now();
+        
+        function simLoop() {
+            const now = performance.now();
+            let dt = (now - lastFrameTime) / 1000.0;
+            lastFrameTime = now;
+            
+            // Prevent dt spikes in inactive background tabs
+            if (dt > 0.1) dt = 0.1;
+
+            // 1. Math Modeling - Filter Wind Speed (`shield_rain`)
+            // Generates raw dynamic turbulent rain noise spikes if rain level is high
+            const rawRainNoiseCoeff = state.rainNoise / 100.0;
+            const turbulenceSpike = (Math.sin(now * 0.015) * 3.5 + (Math.random() - 0.5) * 8.0) * rawRainNoiseCoeff;
+            
+            state.actualWind = Math.max(0, state.windBase + turbulenceSpike);
+            state.filteredWind = filterWindSpeed(state.actualWind, state.rainNoise, dt);
+
+            // 2. Math Modeling - S-curve profile logic (`S-adjusted()`)
+            state.currentPitch = updateSCurvePitch(state.targetPitch, state.currentPitch, dt);
+
+            // 3. Math Modeling - Aerodynamic turbine RPM mechanics
+            // Aerodynamics torque efficiency is maximal at 8 deg pitch, falls linearly as feathered (90 deg pitch)
+            const optimalPitch = 8.0;
+            const featherLimit = 90.0;
+            
+            let dragEfficiency = 1.0;
+            if (state.currentPitch > optimalPitch) {
+                dragEfficiency = Math.max(0, (featherLimit - state.currentPitch) / (featherLimit - optimalPitch));
+            } else {
+                dragEfficiency = Math.max(0.1, state.currentPitch / optimalPitch);
+            }
+
+            // Ideal stable RPM scales directly with local clean filtered wind speed
+            const targetRPM = state.filteredWind * 1.5 * dragEfficiency;
+            
+            // Rotor inertia slows rotational rapid velocity swings
+            const rotorInertiaDamping = 1.2; 
+            state.turbineRPM += (targetRPM - state.turbineRPM) * (dt / rotorInertiaDamping);
+            if (state.turbineRPM < 0.1) state.turbineRPM = 0;
+
+            // Integrate rotational angle
+            const radSec = (state.turbineRPM * 2 * Math.PI) / 60.0;
+            state.turbineAngle += radSec * dt;
+
+            // Power equation (C_p rotor approximation curve)
+            // Power scales roughly with wind speed^3 * rotor aero coefficients
+            const theoreticalPower = 0.5 * 1.225 * Math.pow(state.filteredWind, 2.8) * 0.05 * dragEfficiency;
+            state.generatedPower = Math.max(0, Math.min(8.0, theoreticalPower)); // Rated 8.0MW output
+
+            // 4. Math Modeling - Gearbox high-frequency mesh torsional vibrations
+            state.gearVibration = calculateResonanceVibration(state.turbineRPM, state.resonanceActive, state.dampingActive, dt);
+
+            // --- STREAMING_CHUNK: Logging History & Running Telemetry Updates ---
+            
+            // Update Scope Ring buffers (push old ones out)
+            state.history.rawWind.push(state.actualWind);
+            state.history.rawWind.shift();
+            state.history.filteredWind.push(state.filteredWind);
+            state.history.filteredWind.shift();
+
+            state.history.targetPitch.push(state.targetPitch);
+            state.history.targetPitch.shift();
+            state.history.currentPitch.push(state.currentPitch);
+            state.history.currentPitch.shift();
+
+            state.history.gearVibration.push(state.gearVibration);
+            state.history.gearVibration.shift();
+
+            // Update UI HUD Text outputs
+            el.hudWind.textContent = `${state.filteredWind.toFixed(1)} m/s`;
+            el.hudPitch.textContent = `${state.currentPitch.toFixed(1)}°`;
+            el.hudRpm.textContent = `${state.turbineRPM.toFixed(1)} RPM`;
+            el.hudPower.textContent = `${state.generatedPower.toFixed(2)} MW`;
+
+            // State indicators
+            if (state.currentPitch >= 88.0) {
+                el.stateTag.textContent = "EMERGENCY_SHUTDOWN";
+                el.stateTag.className = "text-xs text-rose-400 font-bold px-2 py-0.5 rounded bg-rose-950/40 border border-rose-900";
+            } else if (state.turbineRPM > 20.0) {
+                el.stateTag.textContent = "WARNING: OVERSPEED";
+                el.stateTag.className = "text-xs text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-950/40 border border-amber-900 animate-pulse";
+            } else {
+                el.stateTag.textContent = "NORMAL_GENERATION";
+                el.stateTag.className = "text-xs text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-900";
+            }
+
+            // --- Renderings outputs ---
+            drawTurbine(el.turbineCanvas.getContext('2d'), el.turbineCanvas.width, el.turbineCanvas.height);
+            
+            // Scope 1: Wind speed filter (raw noisy vs filtered, scale 0 to 45m/s)
+            drawOscilloscope(el.scope1Canvas, state.history.rawWind, state.history.filteredWind, 0, 45, '#f43f5e', '#38bdf8');
+            
+            // Scope 2: Servo trajectory (demand vs actual pitch, scale 0 to 100 deg)
+            drawOscilloscope(el.scope2Canvas, state.history.targetPitch, state.history.currentPitch, -5, 95, '#475569', '#fbbf24');
+            
+            // Scope 3: Vibration suppressor amplitude (scale 0 to 1.0 peak stresses)
+            drawOscilloscope(el.scope3Canvas, state.history.gearVibration, null, 0, 1.0, '#f43f5e');
+
+            // Recursive animation trigger
+            requestAnimationFrame(simLoop);
+        }
+
+        // --- STREAMING_CHUNK: Running Window Initialization ---
+        
+        window.onload = function() {
+            // Resize Canvas to fit dynamically
+            const setupCanvasSizes = () => {
+                const resize = (canvas) => {
+                    canvas.width = canvas.parentElement.clientWidth;
+                    canvas.height = canvas.parentElement.clientHeight || 80;
+                };
+                resize(el.turbineCanvas);
+                el.turbineCanvas.height = 280; // Hard lock center sim
+                resize(el.scope1Canvas);
+                resize(el.scope2Canvas);
+                resize(el.scope3Canvas);
+            };
+
+            window.addEventListener('resize', setupCanvasSizes);
+            setupCanvasSizes();
+
+            // Set up active lighting on essential nodes
+            highlightLayerNode(1, 'blue');
+            highlightLayerNode(3, 'purple');
+            highlightLayerNode(4, 'purple');
+            highlightLayerNode(5, 'emerald');
+            highlightLayerNode(6, 'emerald');
+            highlightLayerNode(7, 'amber');
+            highlightLayerNode(9, 'blue');
+
+            sysLog("[SUCCESS] Mathematical models for wind turbulence, Actuator S-curve and Tooth suppressor compiled successfully.", false);
+            
+            // Start the infinite game loop
+            simLoop();
+        };
+    </script>
+</body>
+</html>
